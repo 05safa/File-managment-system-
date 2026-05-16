@@ -1,0 +1,1 @@
+auth-service/target/auth-service-0.0.1-SNAPSHOT.jar filter=lfs diff=lfs merge=lfs -text

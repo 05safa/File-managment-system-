@@ -18,4 +18,8 @@ spring:
               uri: ${COMMENTS_SERVICE_URL:http://localhost:8086}
               predicates:
                 - Path=/api/comments/**
-              
+
+            - id: auth
+              uri: ${AUTH_SERVICE_URL:http://localhost:8087}
+              predicates:
+                - Path=/api/auth/**,/api/admin/**
