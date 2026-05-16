@@ -8,12 +8,31 @@ spring:
     gateway:
       server:
         webmvc:
+          globalcors:
+            corsConfigurations:
+              '[/**]':
+                allowedOriginPatterns:
+                  - "*"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - PATCH
+                  - OPTIONS
+                allowedHeaders:
+                  - "*"
+                exposedHeaders:
+                  - Authorization
+                  - Content-Disposition
+                allowCredentials: true
+                maxAge: 3600
           routes:
             - id: documents
               uri: ${DOCUMENTS_SERVICE_URL:http://localhost:8084}
               predicates:
                 - Path=/api/documents/**
-              
+
             - id: comments
               uri: ${COMMENTS_SERVICE_URL:http://localhost:8086}
               predicates:
