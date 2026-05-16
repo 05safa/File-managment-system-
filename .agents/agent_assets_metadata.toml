@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "PbyNZVitymg4E_B7b8wzo"
+uri = "file://replit.md"
+type = "text"
+title = "DMS Architecture Reference"
