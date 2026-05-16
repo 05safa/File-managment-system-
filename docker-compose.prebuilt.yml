@@ -1,0 +1,18 @@
+# Use when Docker BuildKit fails with "read-only file system":
+#   .\scripts\docker-up-prebuilt.ps1
+
+services:
+  gateway:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile.runtime
+
+  documents:
+    build:
+      context: ./documents-service
+      dockerfile: Dockerfile.runtime
+
+  comments:
+    build:
+      context: ./comments-service
+      dockerfile: Dockerfile.runtime

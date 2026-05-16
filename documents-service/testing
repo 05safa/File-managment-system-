@@ -1,0 +1,5 @@
+# creating a document
+curl -X POST http://localhost:8081/documents/add -H "Content-Type: application/json" -d '{"title": "My First Document"}'
+
+# listing a document
+curl http://localhost:8081/documents/list

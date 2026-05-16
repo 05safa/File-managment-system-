@@ -1,0 +1,18 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:postgresql://${AUTH_DB_HOST:localhost}:5432/${AUTH_DB_NAME:auth_db}
+    username: ${AUTH_DB_USER:authuser}
+    password: ${AUTH_DB_PASSWORD:authpass123}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+jwt:
+  secret: ${JWT_SECRET:ensia-dms-jwt-secret-key-for-lab-11-minimum-256-bits-long!!}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}

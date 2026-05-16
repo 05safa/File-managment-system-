@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: docker-minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-secret
+  namespace: docker-minio
+type: Opaque
+stringData:
+  MINIO_ROOT_USER: admin
+  MINIO_ROOT_PASSWORD: ensia123456
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: docker-minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        image: quay.io/minio/minio:latest
+        command:
+        - /bin/sh
+        - -c
+        - minio server /data --console-address :9001
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        envFrom:
+        - secretRef:
+            name: minio-secret
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: minio-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: docker-minio
+spec:
+  selector:
+    app: minio
+  ports:
+  - port: 9000
+    targetPort: 9000
+    name: api
+  - port: 9001
+    targetPort: 9001
+    name: console
+  type: LoadBalancer

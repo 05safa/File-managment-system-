@@ -1,0 +1,23 @@
+server:
+  port: 8085
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: documents
+              uri: ${DOCUMENTS_SERVICE_URL:http://documents:8084}
+              predicates:
+                - Path=/api/documents/**
+              
+            - id: comments
+              uri: ${COMMENTS_SERVICE_URL:http://comments:8086}
+              predicates:
+                - Path=/api/comments/**
+
+            - id: auth
+              uri: ${AUTH_SERVICE_URL:http://auth:8087}
+              predicates:
+                - Path=/api/auth/**,/api/admin/**

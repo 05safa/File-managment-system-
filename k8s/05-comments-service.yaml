@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: comments-service
+  namespace: docker-minio
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: comments-service
+  template:
+    metadata:
+      labels:
+        app: comments-service
+    spec:
+      containers:
+      - name: comments
+        image: docker-minio-comments:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8086
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "docker"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres-comments:5432/comments_db"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "commentuser"
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-comments-secret
+              key: POSTGRES_PASSWORD
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/comments/list
+            port: 8086
+          initialDelaySeconds: 45
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/comments/list
+            port: 8086
+          initialDelaySeconds: 30
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: comments-service
+  namespace: docker-minio
+spec:
+  selector:
+    app: comments-service
+  ports:
+  - port: 8086
+    targetPort: 8086
+    protocol: TCP
+  type: ClusterIP
+

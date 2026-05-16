@@ -1,0 +1,229 @@
+# Set COMPOSE_BAKE=false and DOCKER_BUILDKIT=0 in .env if build fails with "read-only file system"
+# Or run infra only: docker compose -f docker-compose.infra.yml up -d  (see scripts/)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: documents-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: documents_db
+      POSTGRES_USER: docuser
+      POSTGRES_PASSWORD: docpass123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres:/scripts:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docuser -d documents_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: auth-postgres
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: authuser
+      POSTGRES_PASSWORD: authpass123
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authuser -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    networks:
+      - app-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - JWT_SECRET=ensia-dms-jwt-secret-key-for-lab-11-minimum-256-bits-long!!
+
+  postgres-comments:
+    image: postgres:16-alpine
+    container_name: comments-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: comments_db
+      POSTGRES_USER: commentuser
+      POSTGRES_PASSWORD: comment123
+    volumes:
+      - postgres_comments_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commentuser -d comments_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    container_name: gateway-service
+    ports:
+      - "8085:8085"
+    depends_on:
+      - documents
+      - comments
+      - auth
+      - minio
+    networks:
+      - app-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DOCUMENTS_SERVICE_URL=http://documents:8084
+      - COMMENTS_SERVICE_URL=http://comments:8086
+      - AUTH_SERVICE_URL=http://auth:8087
+
+  documents:
+    build:
+      context: ./documents-service
+      dockerfile: Dockerfile
+    container_name: documents-service
+    restart: on-failure
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - app-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/documents_db
+      - SPRING_DATASOURCE_USERNAME=docuser
+      - SPRING_DATASOURCE_PASSWORD=docpass123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_URL=http://minio:9000
+      - MINIO_PUBLIC_URL=http://localhost:9000
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=ensia123456
+      - JWT_SECRET=ensia-dms-jwt-secret-key-for-lab-11-minimum-256-bits-long!!
+
+  comments:
+    build:
+      context: ./comments-service
+      dockerfile: Dockerfile
+    container_name: comments-service
+    restart: on-failure
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    ports:
+      - "8086:8086"
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - app-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - CASSANDRA_HOST=cassandra
+      - CASSANDRA_PORT=9042
+      - SPRING_CASSANDRA_CONTACT_POINTS=cassandra
+      - SPRING_CASSANDRA_PORT=9042
+      - SPRING_CASSANDRA_KEYSPACE_NAME=dms
+      - SPRING_CASSANDRA_LOCAL_DATACENTER=datacenter1
+      - JWT_SECRET=ensia-dms-jwt-secret-key-for-lab-11-minimum-256-bits-long!!
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cassandra:
+    image: cassandra:4.1
+    container_name: cassandra-db
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: dms-cluster
+      CASSANDRA_DC: datacenter1
+      HEAP_NEWSIZE: 128M
+      MAX_HEAP_SIZE: 512M
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 120s
+  
+  minio: 
+    image: "quay.io/minio/minio:latest" 
+    ports: 
+      - "9000:9000" 
+      - "9001:9001" 
+    command: ["server", "/data", "--console-address", ":9001"] 
+    environment: 
+      MINIO_ROOT_USER: "admin" 
+      MINIO_ROOT_PASSWORD: "ensia123456" 
+    volumes: 
+      - minio_data:/data 
+    networks:
+      - app-network
+
+volumes:
+  minio_data:
+  postgres_data:
+  postgres_auth_data:
+  postgres_comments_data:
+  redis_data:
+  cassandra_data:
+  
+networks:
+  app-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1450
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+
+
+

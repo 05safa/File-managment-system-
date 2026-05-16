@@ -1,0 +1,5 @@
+# adding a comment
+curl -s -X POST http://localhost:8082/comments/add -H "Content-Type: application/json" -d '{"docId": "doc1", "content": "This is a test comment", "author": "Alice"}'
+
+# listing comments
+curl -s http://localhost:8082/comments/list/doc1 

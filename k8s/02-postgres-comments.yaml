@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-comments-pvc
+  namespace: docker-minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-comments-config
+  namespace: docker-minio
+data:
+  POSTGRES_DB: comments_db
+  POSTGRES_USER: commentuser
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-comments-secret
+  namespace: docker-minio
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: comment123
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-comments
+  namespace: docker-minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-comments
+  template:
+    metadata:
+      labels:
+        app: postgres-comments
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - configMapRef:
+            name: postgres-comments-config
+        - secretRef:
+            name: postgres-comments-secret
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U commentuser
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: postgres-comments-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-comments
+  namespace: docker-minio
+spec:
+  selector:
+    app: postgres-comments
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+  type: ClusterIP
